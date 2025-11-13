@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Fitness Coach</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for chat history */
+        #chat-history::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-history::-webkit-scrollbar-thumb {
+            background-color: #3f3f46; /* zinc-700 */
+            border-radius: 3px;
+        }
+        .message-bubble {
+            max-width: 90%;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 sm:p-8">
+    <!-- Global Variables for Firebase/Gemini Setup (Required) -->
+    <script>
+        const apiKey = ""; // Leave as-is for the environment to inject.
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+    </script>
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-teal-400 tracking-tight">
+                AI Fitness Coach
+            </h1>
+            <p class="text-gray-400 mt-2">Expert Advice & Form Analysis for Peak Performance.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 1. AI Coach Chat Interface (Text Generation) -->
+            <section class="bg-gray-800 rounded-xl shadow-2xl p-6 flex flex-col h-[70vh] min-h-[500px]">
+                <h2 class="text-2xl font-semibold mb-4 text-white border-b border-gray-700 pb-3">
+                    <svg class="w-6 h-6 inline-block mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.518 23.518 0 0112 15c-3.185 0-6.27-.91-8.985-2.245M12 14v5m-3-2h6m-7.172 6h8.344A1.83 1.83 0 0021 19.172V7.828A1.83 1.83 0 0019.172 6H4.828A1.83 1.83 0 003 7.828v11.344A1.83 1.83 0 004.828 21z"></path></svg>
+                    Expert Advice Chat
+                </h2>
+
+                <!-- Chat History Display -->
+                <div id="chat-history" class="flex-grow overflow-y-auto space-y-4 mb-4 pr-2">
+                    <!-- Initial Welcome Message -->
+                    <div class="flex justify-start">
+                        <div class="message-bubble bg-gray-700 p-3 rounded-lg rounded-tl-none shadow-md">
+                            <p class="text-sm text-teal-300 font-medium mb-1">Coach</p>
+                            <p class="text-gray-200">Hello! I'm your AI Fitness Coach. Ask me anything about training, nutrition, or specific sports techniques.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Area (Updated to include file upload) -->
+                <div class="mt-auto flex space-x-3 items-center">
+                    <!-- Hidden File Input (onchange triggers analysis) -->
+                    <input type="file" id="video-upload" accept="video/mp4,video/quicktime" class="hidden" onchange="handleFileUpload()">
+                    
+                    <!-- Attachment Button -->
+                    <button id="attach-btn"
+                            class="bg-gray-700 hover:bg-gray-600 text-white p-3 rounded-lg transition duration-150 flex-shrink-0"
+                            title="Upload Video for Analysis"
+                            onclick="document.getElementById('video-upload').click()">
+                        <!-- Clip icon -->
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.57 6.57a4 4 0 000 5.656L15.172 21M9.828 7l6.57 6.57a4 4 0 010 5.656L9.828 21M3 3l.707.707M14 11a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </button>
+
+                    <input type="text" id="chat-input" placeholder="e.g., Best protein sources for muscle gain..."
+                           class="flex-grow bg-gray-700 text-gray-100 border border-gray-600 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-teal-500 transition duration-150"
+                           onkeypress="if(event.key === 'Enter') document.getElementById('send-btn').click()">
+                    <button id="send-btn"
+                            class="bg-teal-600 hover:bg-teal-500 text-white font-semibold py-3 px-4 rounded-lg transition duration-150 disabled:opacity-50 flex items-center justify-center flex-shrink-0"
+                            onclick="handleTextAdvice()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </button>
+                </div>
+            </section>
+
+            <!-- 2. Video Analysis Interface (Result Display Only) -->
+            <section class="bg-gray-800 rounded-xl shadow-2xl p-6 flex flex-col h-[70vh] min-h-[500px]">
+                <h2 class="text-2xl font-semibold mb-4 text-white border-b border-gray-700 pb-3">
+                    <svg class="w-6 h-6 inline-block mr-2 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    Video Form Analysis Results
+                </h2>
+
+                <div class="flex-grow overflow-y-auto space-y-6 pb-4">
+                    <div class="text-sm text-gray-400 bg-gray-700/50 p-3 rounded-lg">
+                        <p>Upload a workout video using the <span class="text-teal-400 font-bold">attachment icon</span> in the chat panel to see analysis results here.</p>
+                        <p class="mt-2 text-yellow-400 font-semibold">NOTE: This feature is simulated.</p>
+                    </div>
+
+                    <!-- Analysis Result Display -->
+                    <div id="video-result" class="space-y-4">
+                        <!-- Results will be injected here after file upload and simulation -->
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // --- Utility Functions ---
+
+        /** Global state for managing the chat history (optional for API context) */
+        let chatHistory = [];
+
+        /**
+         * Simple sleep function for exponential backoff simulation.
+         * @param {number} ms - Milliseconds to wait.
+         */
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        /**
+         * Retries a fetch request with exponential backoff.
+         * @param {string} url - The API URL.
+         * @param {object} options - Fetch options (method, headers, body).
+         * @param {number} maxRetries - Maximum number of retries.
+         */
+        async function retryFetch(url, options, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) {
+                        return response;
+                    } else if (response.status === 429 || response.status >= 500) {
+                        // Rate limit or server error: try again
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        console.warn(`API call failed with status ${response.status}. Retrying in ${delay / 1000}s...`);
+                        await sleep(delay);
+                    } else {
+                        // Client error (4xx) - don't retry
+                        throw new Error(`API returned client error: ${response.statusText}`);
+                    }
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        throw new Error('Maximum retries exceeded. The API might be unavailable.');
+                    }
+                    // For network errors, calculate delay and retry
+                    const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                    console.error(`Network Error: ${error.message}. Retrying in ${delay / 1000}s...`);
+                    await sleep(delay);
+                }
+            }
+        }
+
+        /**
+         * Renders a single message bubble into the chat history.
+         * @param {string} text - The message content.
+         * @param {Array<object>} sources - Optional array of citation sources.
+         * @param {('user'|'coach')} sender - The sender of the message.
+         */
+        function renderMessage(text, sources = [], sender) {
+            const history = document.getElementById('chat-history');
+            const isUser = sender === 'user';
+            const alignment = isUser ? 'justify-end' : 'justify-start';
+            const color = isUser ? 'bg-teal-600' : 'bg-gray-700';
+            const rounded = isUser ? 'rounded-br-none' : 'rounded-tl-none';
+            const textColor = isUser ? 'text-white' : 'text-gray-200';
+            const nameColor = isUser ? 'text-teal-200' : 'text-teal-300';
+            const name = isUser ? 'You' : 'Coach';
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${alignment}`;
+
+            let sourcesHtml = '';
+            if (sources.length > 0) {
+                sourcesHtml = `
+                    <div class="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-400">
+                        <p class="font-semibold mb-1">Sources:</p>
+                        <ul class="list-disc list-inside space-y-0.5">
+                            ${sources.map(s => `<li><a href="${s.uri}" target="_blank" class="hover:underline text-teal-300">${s.title}</a></li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-bubble ${color} p-3 rounded-xl ${rounded} shadow-lg">
+                    <p class="text-xs ${nameColor} font-medium mb-1">${name}</p>
+                    <div class="${textColor} text-base break-words whitespace-pre-wrap">${text}</div>
+                    ${sourcesHtml}
+                </div>
+            `;
+            history.appendChild(messageDiv);
+            history.scrollTop = history.scrollHeight;
+        }
+
+        // --- Core Application Logic ---
+
+        /**
+         * Handles the text advice generation via the Gemini API.
+         */
+        async function handleTextAdvice() {
+            const inputElement = document.getElementById('chat-input');
+            const sendButton = document.getElementById('send-btn');
+            const userQuery = inputElement.value.trim();
+
+            if (!userQuery) return;
+
+            // 1. Display user message and clear input
+            renderMessage(userQuery, [], 'user');
+            inputElement.value = '';
+
+            // 2. Disable input/button and show loading state
+            sendButton.disabled = true;
+            const loadingId = 'loading-' + Date.now();
+            const history = document.getElementById('chat-history');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = loadingId;
+            loadingDiv.className = 'flex justify-start';
+            loadingDiv.innerHTML = `
+                <div class="message-bubble bg-gray-700 p-3 rounded-lg rounded-tl-none shadow-md">
+                    <p class="text-sm text-teal-300 font-medium mb-1">Coach</p>
+                    <div class="flex items-center space-x-2">
+                        <svg class="animate-spin h-5 w-5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-gray-300">Coach is thinking...</span>
+                    </div>
+                </div>
+            `;
+            history.appendChild(loadingDiv);
+            history.scrollTop = history.scrollHeight;
+
+            // Prepare the payload for the Gemini API call
+            // --- UPDATED SYSTEM PROMPT FOR CONCISE ANSWERS ---
+            const systemPrompt = "You are an AI Fitness Coach specializing in evidence-based advice for fitness, sports technique, and personalized nutrition. Provide clear, actionable, and grounded advice. Crucially, keep all responses simple, concise, and ideally under three short paragraphs for quick user readability. If asked for real-time data or analysis, use Google Search grounding. Keep your responses encouraging.";
+            // --------------------------------------------------
+
+            chatHistory.push({ role: "user", parts: [{ text: userQuery }] });
+
+            const payload = {
+                contents: chatHistory,
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            try {
+                const response = await retryFetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const text = candidate.content.parts[0].text;
+                    let sources = [];
+                    const groundingMetadata = candidate.groundingMetadata;
+
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title || 'External Source',
+                            }))
+                            .filter(source => source.uri);
+                    }
+
+                    // Update chat history with the model's response
+                    chatHistory.push({ role: "model", parts: [{ text: text }] });
+
+                    // 3. Remove loading indicator and display the final message
+                    document.getElementById(loadingId)?.remove();
+                    renderMessage(text, sources, 'coach');
+
+                } else {
+                    throw new Error("Received an empty or malformed response from the model.");
+                }
+
+            } catch (error) {
+                console.error("Gemini API Error:", error);
+                document.getElementById(loadingId)?.remove();
+                renderMessage("Sorry, I encountered an error while trying to generate advice. Please try again.", [], 'coach');
+
+            } finally {
+                sendButton.disabled = false;
+            }
+        }
+
+        /**
+         * Handles the simulated video analysis process, triggered by file input change.
+         */
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('video-upload');
+            const resultDiv = document.getElementById('video-result');
+
+            if (fileInput.files.length === 0) {
+                resultDiv.innerHTML = `<p class="text-red-400 text-sm mt-2 p-3 bg-red-900/50 rounded-lg">No file selected.</p>`;
+                return;
+            }
+
+            const fileName = fileInput.files[0].name;
+
+            // 1. Show analysis request in the chat window
+            renderMessage(`Video uploaded: ${fileName}. Analyzing form...`, [], 'user');
+
+
+            // 2. Show loading state in the result panel
+            resultDiv.innerHTML = `
+                <div id="video-loading" class="flex items-center space-x-3 text-lg text-teal-400 p-4 bg-gray-700 rounded-lg shadow-lg">
+                    <svg class="animate-spin h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Analyzing '${fileName}'... (Simulation)</span>
+                </div>
+            `;
+
+            // 3. Simulate processing delay (3 seconds)
+            await sleep(3000);
+
+            // 4. Generate Mock Feedback (Designed to be constructive/critical for teaching)
+            const mockFeedback = {
+                exercise: "Overhead Press",
+                title: "Overhead Press Form Analysis: Good Start, Watch the Hips",
+                rating: "8/10 (Solid Form)",
+                technique: [
+                    { metric: "Bar Path", status: "Excellent", feedback: "Bar travelled directly over the mid-foot. This shows great balance and control." },
+                    { metric: "Elbow Position", status: "Good", feedback: "Elbows were tucked nicely under the bar in the rack position, minimizing shoulder strain." },
+                    { metric: "Hip/Core Stability", status: "Critical", feedback: "Slight 'leaning back' (hyperextension) of the lower back observed on the final few inches of the press. Remember to brace your core and glutes hard to maintain a neutral spine." },
+                    { metric: "Lockout", status: "Good", feedback: "Full lockout achieved, shrugging shoulders to support the weight overhead." }
+                ],
+                overall: "Very good effort! Your foundation is strong. To perfect the lift and prevent back strain, focus intensely on core bracing—think about pulling your ribs down toward your hips before and during the push. Try a lighter weight next time and film yourself focusing only on glute and core engagement."
+            };
+
+            // 5. Send confirmation message to chat
+            renderMessage(`Analysis complete for your ${mockFeedback.exercise} video. View the detailed feedback in the 'Video Form Analysis Results' panel.`, [], 'coach');
+
+            // 6. Render results
+            document.getElementById('video-loading')?.remove();
+
+            const ratingClass = mockFeedback.rating.includes('Good') || mockFeedback.rating.includes('Excellent') || mockFeedback.rating.includes('Solid') ? 'text-green-400' : 'text-yellow-400';
+
+            resultDiv.innerHTML = `
+                <div class="bg-gray-700 p-6 rounded-xl shadow-2xl">
+                    <h3 class="text-xl font-bold mb-3 text-white">${mockFeedback.title}</h3>
+
+                    <div class="flex justify-between items-center mb-4 pb-3 border-b border-gray-600">
+                        <span class="text-lg font-medium text-gray-300">Overall Rating:</span>
+                        <span class="text-2xl font-extrabold ${ratingClass}">${mockFeedback.rating}</span>
+                    </div>
+
+                    <h4 class="text-lg font-semibold text-teal-400 mb-3">Detailed Technique Feedback:</h4>
+                    <ul class="space-y-3">
+                        ${mockFeedback.technique.map(item => `
+                            <li class="p-3 bg-gray-800 rounded-lg border-l-4 ${item.status === 'Critical' ? 'border-red-500' : item.status === 'Poor' ? 'border-yellow-500' : 'border-green-500'}">
+                                <p class="font-bold text-gray-200">${item.metric}: <span class="font-normal text-sm text-gray-400">(${item.status})</span></p>
+                                <p class="text-sm text-gray-300 mt-1">${item.feedback}</p>
+                            </li>
+                        `).join('')}
+                    </ul>
+
+                    <h4 class="text-lg font-semibold text-teal-400 mt-6 mb-2">Coach's Summary:</h4>
+                    <p class="text-gray-300 bg-gray-800 p-3 rounded-lg">${mockFeedback.overall}</p>
+                </div>
+            `;
+
+            // Reset file input so the same file can be uploaded again
+            fileInput.value = '';
+        }
+
+        // Initialize with a default chat history if needed, or simply let the welcome message stand.
+    </script>
+</body>
+</html>
